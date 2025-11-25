@@ -1,0 +1,57 @@
+# Alternative optimized Dockerfile without BuildKit cache mounts
+# Use this if your Docker version doesn't support BuildKit
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install system dependencies needed for Tesseract.js
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev
+
+# Configure npm for better performance
+RUN npm config set fetch-retries 3 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set progress false && \
+    npm config set loglevel warn
+
+# Copy package files first (better layer caching)
+COPY package*.json ./
+
+# Install all dependencies
+# Using npm ci for faster, reliable installs
+# --ignore-scripts first to avoid Tesseract.js download during install
+RUN npm ci --ignore-scripts
+
+# Now rebuild Tesseract.js with proper dependencies
+RUN npm rebuild tesseract.js || npm install tesseract.js --force
+
+# Copy Prisma schema
+COPY prisma ./prisma/
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production
+
+EXPOSE 4000
+
+CMD ["npm", "start"]
+
