@@ -2,7 +2,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-const uploadDir = path.join(__dirname, '../../uploads');
+// Use environment variable or default to uploads directory relative to app root
+const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 // Ensure upload directory exists
 if (!fs.existsSync(uploadDir)) {

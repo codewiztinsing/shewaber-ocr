@@ -1,4 +1,17 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: shewaber-ocr-redis
+    ports:
+      - "6380:6379"  # Use 6380 externally to avoid conflict with local Redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   postgres:
     image: postgres:15-alpine
     container_name: shewaber-ocr-db
@@ -7,7 +20,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: shewaber_ocr
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Use 5433 externally to avoid conflict with local PostgreSQL
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,8 +36,11 @@ services:
     container_name: shewaber-ocr-backend
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/shewaber_ocr?schema=public
+      REDIS_URL: redis://redis:6379
       PORT: 4000
       NODE_ENV: production
+      UPLOAD_DIR: /app/uploads
+      FRONTEND_URL: http://localhost:3000
     ports:
       - "4000:4000"
     volumes:
@@ -32,15 +48,40 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && npm start"
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy || true && npm start"
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: shewaber-ocr-worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/shewaber_ocr?schema=public
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npm run start:worker"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GRAPHQL_URL: http://localhost:4000/graphql
+        NEXT_PUBLIC_API_URL: http://localhost:4000
     container_name: shewaber-ocr-frontend
     environment:
       NEXT_PUBLIC_GRAPHQL_URL: http://localhost:4000/graphql
+      NEXT_PUBLIC_API_URL: http://localhost:4000
     ports:
       - "3000:3000"
     depends_on:
@@ -48,4 +89,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 

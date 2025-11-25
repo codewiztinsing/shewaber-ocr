@@ -3,14 +3,16 @@
   "version": "1.0.0",
   "description": "GraphQL API for Receipt OCR",
   "main": "dist/index.js",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
-  },
+    "scripts": {
+      "dev": "tsx watch src/index.ts",
+      "dev:worker": "tsx watch src/worker.ts",
+      "build": "tsc",
+      "start": "node dist/index.js",
+      "start:worker": "node dist/worker.js",
+      "prisma:generate": "prisma generate",
+      "prisma:migrate": "prisma migrate dev",
+      "prisma:studio": "prisma studio"
+    },
   "dependencies": {
     "@apollo/server": "^4.9.5",
     "@as-integrations/fastify": "^2.1.0",
@@ -21,7 +23,9 @@
     "multer": "^1.4.5-lts.1",
     "tesseract.js": "^5.0.4",
     "dotenv": "^16.3.1",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "bullmq": "^5.4.0",
+    "ioredis": "^5.3.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

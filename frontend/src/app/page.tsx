@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useQuery, gql } from '@apollo/client'
 
+// API URL - will be replaced at build time with NEXT_PUBLIC_API_URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 const GET_RECEIPTS = gql`
   query GetReceipts($filter: ReceiptFilter) {
     receipts(filter: $filter) {
@@ -73,7 +76,7 @@ export default function Home() {
     formData.append('file', selectedFile)
 
     try {
-      const response = await fetch('http://localhost:4000/api/upload', {
+      const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         body: formData,
       })
@@ -143,7 +146,7 @@ export default function Home() {
         </button>
         {uploadError && (
           <div className="error">
-            Error: {uploadError.message}
+            Error: {uploadError}
           </div>
         )}
       </div>
@@ -199,9 +202,13 @@ export default function Home() {
                 {receipt.imageUrl && (
                   <div>
                     <img
-                      src={`http://localhost:4000${receipt.imageUrl}`}
+                      src={`${API_URL}${receipt.imageUrl}`}
                       alt="Receipt"
                       style={{ maxWidth: '100%', marginTop: '1rem', borderRadius: '4px' }}
+                      onError={(e) => {
+                        console.error('Failed to load image:', receipt.imageUrl);
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
                     />
                   </div>
                 )}

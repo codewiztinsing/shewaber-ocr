@@ -27,9 +27,39 @@ export const typeDefs = gql`
     endDate: String
   }
 
+  type JobStatus {
+    id: String!
+    state: String!
+    progress: Int
+    result: OCRJobResult
+    failedReason: String
+    timestamp: Float
+  }
+
+  type OCRJobResult {
+    receiptId: String!
+    storeName: String
+    purchaseDate: String
+    totalAmount: Float
+    items: [ItemResult!]!
+  }
+
+  type ItemResult {
+    name: String!
+    quantity: Int
+    price: Float
+  }
+
+  type UploadResponse {
+    jobId: String!
+    message: String!
+    status: String!
+  }
+
   type Query {
     receipts(filter: ReceiptFilter): [Receipt!]!
     receipt(id: ID!): Receipt
+    jobStatus(jobId: String!): JobStatus
   }
 
   type Mutation {

@@ -49,6 +49,11 @@ export const resolvers = {
         },
       });
     },
+
+    jobStatus: async (_: any, args: { jobId: string }, context: Context) => {
+      const { getJobStatus } = await import('../queue/ocr.queue');
+      return await getJobStatus(args.jobId);
+    },
   },
 
   Mutation: {

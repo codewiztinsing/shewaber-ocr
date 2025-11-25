@@ -14,6 +14,7 @@ import { resolvers } from './graphql/resolvers';
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import { upload } from './utils/fileUpload';
+import { addOCRJob, closeQueue } from './queue/ocr.queue';
 
 // Verify DATABASE_URL is set
 if (!process.env.DATABASE_URL) {
@@ -29,15 +30,30 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Create uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, '../uploads');
+// Use environment variable or default to uploads directory relative to app root
+const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+console.log(`📁 Upload directory: ${uploadDir}`);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
 app.use(express.json());
-app.use('/uploads', express.static(uploadDir));
+
+// Serve uploaded images
+app.use('/uploads', express.static(uploadDir, {
+  setHeaders: (res, path) => {
+    // Set proper cache headers for images
+    if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') || 
+        path.endsWith('.gif') || path.endsWith('.webp')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+    }
+  },
+}));
 
 // Create a singleton OCR service instance to reuse worker
 let ocrServiceInstance: any = null;
@@ -50,10 +66,9 @@ async function getOCRService() {
   return ocrServiceInstance;
 }
 
-// REST endpoint for file upload
+// REST endpoint for file upload (now uses background processing)
+// @ts-ignore - Multer type conflict with Express types
 app.post('/api/upload', upload.single('file'), async (req: express.Request, res: express.Response) => {
-  let ocrService: any = null;
-  
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -62,38 +77,37 @@ app.post('/api/upload', upload.single('file'), async (req: express.Request, res:
     const filePath = req.file.path;
     const imageUrl = `/uploads/${req.file.filename}`;
 
-    // Get OCR service instance
-    ocrService = await getOCRService();
-
-    // Perform OCR with timeout (30 seconds)
-    const extractedData = await Promise.race([
-      ocrService.extractData(filePath),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('OCR processing timeout (30s)')), 30000)
-      )
-    ]) as any;
-
-    // Save to database
-    const receipt = await prisma.receipt.create({
+    // Create a placeholder receipt in the database immediately
+    const placeholderReceipt = await prisma.receipt.create({
       data: {
-        storeName: extractedData.storeName || null,
-        purchaseDate: extractedData.purchaseDate || null,
-        totalAmount: extractedData.totalAmount || null,
+        storeName: null,
+        purchaseDate: null,
+        totalAmount: null,
         imageUrl,
         items: {
-          create: extractedData.items.map((item: any) => ({
-            name: item.name,
-            quantity: item.quantity || null,
-            price: item.price || null,
-          })),
+          create: [], // Empty items initially
         },
-      },
-      include: {
-        items: true,
       },
     });
 
-    res.json(receipt);
+    // Add OCR job to queue for background processing
+    const job = await addOCRJob({
+      filePath,
+      filename: req.file.filename,
+      imageUrl,
+      receiptId: placeholderReceipt.id,
+    });
+
+    console.log(`[API] Added OCR job ${job.id} to queue for receipt ${placeholderReceipt.id}`);
+
+    // Return job ID and receipt immediately
+    res.json({
+      jobId: job.id,
+      receiptId: placeholderReceipt.id,
+      message: 'File uploaded successfully. OCR processing started in background.',
+      status: 'processing',
+      receipt: placeholderReceipt,
+    });
   } catch (error: any) {
     console.error('Upload error:', error);
     
@@ -107,7 +121,7 @@ app.post('/api/upload', upload.single('file'), async (req: express.Request, res:
     }
     
     // Return user-friendly error message
-    const errorMessage = error.message || 'OCR processing failed';
+    const errorMessage = error.message || 'Upload failed';
     res.status(500).json({ 
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -115,10 +129,28 @@ app.post('/api/upload', upload.single('file'), async (req: express.Request, res:
   }
 });
 
+// REST endpoint to check job status
+app.get('/api/job/:jobId', async (req: express.Request, res: express.Response) => {
+  try {
+    const { getJobStatus } = await import('./queue/ocr.queue');
+    const status = await getJobStatus(req.params.jobId);
+    
+    if (!status) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    res.json(status);
+  } catch (error: any) {
+    console.error('Job status error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to get job status'
+    });
+  }
+});
+
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  context: () => ({ prisma }),
 });
 
 async function startServer() {
@@ -153,6 +185,13 @@ async function gracefulShutdown() {
     } catch (error) {
       console.error('Error terminating OCR service:', error);
     }
+  }
+  
+  // Close queue connection
+  try {
+    await closeQueue();
+  } catch (error) {
+    console.error('Error closing queue:', error);
   }
   
   // Disconnect Prisma

@@ -2,7 +2,7 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install system dependencies needed for Tesseract.js and native modules
+# Install system dependencies needed for Tesseract.js, Prisma, and native modules
 RUN apk add --no-cache \
     python3 \
     make \
@@ -11,7 +11,9 @@ RUN apk add --no-cache \
     jpeg-dev \
     pango-dev \
     giflib-dev \
-    pixman-dev
+    pixman-dev \
+    openssl \
+    openssl-dev
 
 # Configure npm for better performance and reduce output
 RUN npm config set fetch-retries 3 && \
