@@ -30,15 +30,27 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
       // Update job progress
       await job.updateProgress(10);
 
-      // Verify file exists
+      // Construct file path using UPLOAD_DIR if filePath is relative or doesn't exist
+      const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+      let actualFilePath = filePath;
+      
+      // If file doesn't exist at the given path, try constructing it from uploadDir
       if (!fs.existsSync(filePath)) {
-        throw new Error(`File not found: ${filePath}`);
+        actualFilePath = path.join(uploadDir, filename);
+        console.log(`[Worker] File not found at ${filePath}, trying ${actualFilePath}`);
       }
+      
+      // Verify file exists
+      if (!fs.existsSync(actualFilePath)) {
+        throw new Error(`File not found: ${filePath} or ${actualFilePath}`);
+      }
+      
+      console.log(`[Worker] Using file path: ${actualFilePath}`);
 
       await job.updateProgress(20);
 
       // Perform OCR
-      const extractedData = await ocrService.extractData(filePath);
+      const extractedData = await ocrService.extractData(actualFilePath);
       await job.updateProgress(70);
 
       // Save to database
@@ -46,11 +58,17 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
       
       if (receiptId) {
         // Update existing receipt
+        // Validate date before saving
+        let validDate = null;
+        if (extractedData.purchaseDate && !isNaN(extractedData.purchaseDate.getTime())) {
+          validDate = extractedData.purchaseDate;
+        }
+        
         receipt = await prisma.receipt.update({
           where: { id: receiptId },
           data: {
             storeName: extractedData.storeName || null,
-            purchaseDate: extractedData.purchaseDate || null,
+            purchaseDate: validDate,
             totalAmount: extractedData.totalAmount || null,
             items: {
               deleteMany: {}, // Remove old items
@@ -67,10 +85,16 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
         });
       } else {
         // Create new receipt
+        // Validate date before saving
+        let validDate = null;
+        if (extractedData.purchaseDate && !isNaN(extractedData.purchaseDate.getTime())) {
+          validDate = extractedData.purchaseDate;
+        }
+        
         receipt = await prisma.receipt.create({
           data: {
             storeName: extractedData.storeName || null,
-            purchaseDate: extractedData.purchaseDate || null,
+            purchaseDate: validDate,
             totalAmount: extractedData.totalAmount || null,
             imageUrl,
             items: {
@@ -107,9 +131,11 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
       console.error(`[Worker] Error processing job ${job.id}:`, error);
       
       // Clean up file on error
-      if (fs.existsSync(filePath)) {
+      const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+      const fileToDelete = fs.existsSync(filePath) ? filePath : path.join(uploadDir, filename);
+      if (fs.existsSync(fileToDelete)) {
         try {
-          fs.unlinkSync(filePath);
+          fs.unlinkSync(fileToDelete);
         } catch (unlinkError) {
           console.error('Error deleting file:', unlinkError);
         }

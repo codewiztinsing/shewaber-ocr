@@ -74,8 +74,15 @@ app.post('/api/upload', upload.single('file'), async (req: express.Request, res:
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const filePath = req.file.path;
+    // Use consistent path that works in both backend and worker containers
+    const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+    const filePath = path.join(uploadDir, req.file.filename);
     const imageUrl = `/uploads/${req.file.filename}`;
+
+    // Verify file was saved correctly
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File was not saved correctly: ${filePath}`);
+    }
 
     // Create a placeholder receipt in the database immediately
     const placeholderReceipt = await prisma.receipt.create({
