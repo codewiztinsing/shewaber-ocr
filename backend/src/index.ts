@@ -37,12 +37,17 @@ if (!fs.existsSync(uploadDir)) {
 }
 console.log(`📁 Upload directory: ${uploadDir}`);
 
-// Middleware
+// Global CORS middleware (applied to all routes)
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Body parser middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded images
 app.use('/uploads', express.static(uploadDir, {
@@ -155,6 +160,121 @@ app.get('/api/job/:jobId', async (req: express.Request, res: express.Response) =
   }
 });
 
+// REST endpoint to get receipt details
+app.get('/api/receipt/:id', async (req: express.Request, res: express.Response) => {
+  try {
+    const receipt = await prisma.receipt.findUnique({
+      where: { id: req.params.id },
+      include: { items: true },
+    });
+
+    if (!receipt) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+
+    res.json(receipt);
+  } catch (error: any) {
+    console.error('Get receipt error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to get receipt'
+    });
+  }
+});
+
+// REST endpoint to update receipt
+app.put('/api/receipt/:id', express.json(), async (req: express.Request, res: express.Response) => {
+  try {
+    const { storeName, purchaseDate, totalAmount, items } = req.body;
+
+    // Validate receipt exists
+    const existingReceipt = await prisma.receipt.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!existingReceipt) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+
+    if (storeName !== undefined) updateData.storeName = storeName || null;
+    if (purchaseDate !== undefined) {
+      const date = purchaseDate ? new Date(purchaseDate) : null;
+      updateData.purchaseDate = date && !isNaN(date.getTime()) ? date : null;
+    }
+    if (totalAmount !== undefined) updateData.totalAmount = totalAmount ? parseFloat(totalAmount) : null;
+
+    // Update receipt
+    const receipt = await prisma.receipt.update({
+      where: { id: req.params.id },
+      data: {
+        ...updateData,
+        ...(items && {
+          items: {
+            deleteMany: {},
+            create: items.map((item: any) => ({
+              name: item.name,
+              quantity: item.quantity ? parseInt(item.quantity) : null,
+              price: item.price ? parseFloat(item.price) : null,
+            })),
+          },
+        }),
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    res.json(receipt);
+  } catch (error: any) {
+    console.error('Update receipt error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to update receipt'
+    });
+  }
+});
+
+// REST endpoint to delete receipt
+app.delete('/api/receipt/:id', async (req: express.Request, res: express.Response) => {
+  try {
+    // Check if receipt exists
+    const receipt = await prisma.receipt.findUnique({
+      where: { id: req.params.id },
+      include: { items: true },
+    });
+
+    if (!receipt) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+
+    // Delete receipt (items will be deleted automatically)
+    await prisma.receipt.delete({
+      where: { id: req.params.id },
+    });
+
+    // Optionally delete the image file
+    if (receipt.imageUrl) {
+      try {
+        const imagePath = path.join(uploadDir, receipt.imageUrl.replace('/uploads/', ''));
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+        }
+      } catch (fileError) {
+        console.error('Error deleting image file:', fileError);
+        // Don't fail the deletion if file deletion fails
+      }
+    }
+
+    res.json({ success: true, message: 'Receipt deleted successfully' });
+  } catch (error: any) {
+    console.error('Delete receipt error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to delete receipt'
+    });
+  }
+});
+
 const server = new ApolloServer({
   typeDefs,
   resolvers,
@@ -163,8 +283,14 @@ const server = new ApolloServer({
 async function startServer() {
   await server.start();
 
-    app.use(
+  // GraphQL endpoint with proper CORS handling
+  app.use(
     '/graphql',
+    cors({
+      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      credentials: true,
+    }),
+    express.json(),
     expressMiddleware(server, {
       context: async ({ req }: { req: express.Request }) => ({ prisma, req }),
     })

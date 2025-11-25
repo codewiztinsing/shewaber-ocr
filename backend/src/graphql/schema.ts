@@ -27,6 +27,19 @@ export const typeDefs = gql`
     endDate: String
   }
 
+  input UpdateReceiptInput {
+    storeName: String
+    purchaseDate: String
+    totalAmount: Float
+  }
+
+  input UpdateItemInput {
+    id: String
+    name: String
+    quantity: Int
+    price: Float
+  }
+
   type JobStatus {
     id: String!
     state: String!
@@ -64,6 +77,9 @@ export const typeDefs = gql`
 
   type Mutation {
     uploadReceipt(imageUrl: String!): Receipt!
+    updateReceipt(id: ID!, input: UpdateReceiptInput!, items: [UpdateItemInput!]): Receipt!
+    deleteReceipt(id: ID!): Boolean!
+    deleteItem(id: ID!): Boolean!
   }
 `;
 

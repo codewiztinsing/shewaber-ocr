@@ -72,6 +72,113 @@ export const resolvers = {
 
       return receipt;
     },
+
+    updateReceipt: async (_: any, args: { id: string; input: any; items?: any[] }, context: Context) => {
+      const { id, input, items } = args;
+
+      // Validate receipt exists
+      const existingReceipt = await context.prisma.receipt.findUnique({
+        where: { id },
+      });
+
+      if (!existingReceipt) {
+        throw new Error('Receipt not found');
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      if (input.storeName !== undefined) {
+        updateData.storeName = input.storeName;
+      }
+
+      if (input.purchaseDate !== undefined) {
+        // Validate date
+        const date = input.purchaseDate ? new Date(input.purchaseDate) : null;
+        updateData.purchaseDate = date && !isNaN(date.getTime()) ? date : null;
+      }
+
+      if (input.totalAmount !== undefined) {
+        updateData.totalAmount = input.totalAmount;
+      }
+
+      // Update receipt
+      const receipt = await context.prisma.receipt.update({
+        where: { id },
+        data: {
+          ...updateData,
+          ...(items && {
+            items: {
+              deleteMany: {}, // Delete all existing items
+              create: items.map((item) => ({
+                name: item.name,
+                quantity: item.quantity || null,
+                price: item.price || null,
+              })),
+            },
+          }),
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      return receipt;
+    },
+
+    deleteReceipt: async (_: any, args: { id: string }, context: Context) => {
+      // Check if receipt exists
+      const receipt = await context.prisma.receipt.findUnique({
+        where: { id: args.id },
+        include: { items: true },
+      });
+
+      if (!receipt) {
+        throw new Error('Receipt not found');
+      }
+
+      // Delete receipt (items will be deleted automatically due to onDelete: Cascade)
+      await context.prisma.receipt.delete({
+        where: { id: args.id },
+      });
+
+      // Optionally delete the image file
+      if (receipt.imageUrl) {
+        try {
+          const fs = await import('fs');
+          const path = await import('path');
+          const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+          const imagePath = path.join(uploadDir, receipt.imageUrl.replace('/uploads/', ''));
+          
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+          }
+        } catch (error) {
+          console.error('Error deleting image file:', error);
+          // Don't fail the deletion if file deletion fails
+        }
+      }
+
+      return true;
+    },
+
+    deleteItem: async (_: any, args: { id: string }, context: Context) => {
+      // Check if item exists
+      const item = await context.prisma.item.findUnique({
+        where: { id: args.id },
+      });
+
+      if (!item) {
+        throw new Error('Item not found');
+      }
+
+      // Delete item
+      await context.prisma.item.delete({
+        where: { id: args.id },
+      });
+
+      return true;
+    },
   },
 };
 
