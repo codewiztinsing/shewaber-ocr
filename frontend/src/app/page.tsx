@@ -46,34 +46,7 @@ const GET_RECEIPT = gql`
   }
 `
 
-const UPDATE_RECEIPT = gql`
-  mutation UpdateReceipt($id: ID!, $input: UpdateReceiptInput!, $items: [UpdateItemInput!]) {
-    updateReceipt(id: $id, input: $input, items: $items) {
-      id
-      storeName
-      purchaseDate
-      totalAmount
-      items {
-        id
-        name
-        quantity
-        price
-      }
-    }
-  }
-`
 
-const DELETE_RECEIPT = gql`
-  mutation DeleteReceipt($id: ID!) {
-    deleteReceipt(id: $id)
-  }
-`
-
-const DELETE_ITEM = gql`
-  mutation DeleteItem($id: ID!) {
-    deleteItem(id: $id)
-  }
-`
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -83,8 +56,6 @@ export default function Home() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
-  const [editingReceipt, setEditingReceipt] = useState<any>(null)
-  const [editForm, setEditForm] = useState<any>({})
   const [activeView, setActiveView] = useState<'all' | 'verified'>('all')
 
   const { data, loading, error, refetch } = useQuery(GET_RECEIPTS, {
@@ -97,17 +68,6 @@ export default function Home() {
     },
   })
 
-  const [updateReceipt] = useMutation(UPDATE_RECEIPT, {
-    refetchQueries: [{ query: GET_RECEIPTS }],
-  })
-
-  const [deleteReceipt] = useMutation(DELETE_RECEIPT, {
-    refetchQueries: [{ query: GET_RECEIPTS }],
-  })
-
-  const [deleteItem] = useMutation(DELETE_ITEM, {
-    refetchQueries: [{ query: GET_RECEIPTS }],
-  })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -192,110 +152,12 @@ export default function Home() {
     setSelectedReceipt(receipt)
   }
 
-  const handleEdit = (receipt: any) => {
-    setEditingReceipt(receipt)
-    setEditForm({
-      storeName: receipt.storeName || '',
-      purchaseDate: receipt.purchaseDate ? new Date(receipt.purchaseDate).toISOString().split('T')[0] : '',
-      totalAmount: receipt.totalAmount || '',
-      items: (receipt.items || []).map((item: any) => ({
-        id: item.id,
-        name: item.name || '',
-        quantity: item.quantity || '',
-        price: item.price || '',
-      })),
-    })
-  }
-
-  const handleUpdate = async () => {
-    try {
-      // Ensure items array exists and filter out empty items
-      const items = (editForm.items || []).map((item: any) => ({
-        id: item.id || null,
-        name: item.name || '',
-        quantity: item.quantity ? parseInt(item.quantity) : null,
-        price: item.price ? parseFloat(item.price) : null,
-      })).filter((item: any) => item.name && item.name.trim() !== '')
-
-      await updateReceipt({
-        variables: {
-          id: editingReceipt.id,
-          input: {
-            storeName: editForm.storeName || null,
-            purchaseDate: editForm.purchaseDate || null,
-            totalAmount: editForm.totalAmount ? parseFloat(editForm.totalAmount) : null,
-          },
-          items: items.length > 0 ? items : [],
-        },
-      })
-
-      setEditingReceipt(null)
-      setEditForm({})
-      alert('Receipt updated successfully!')
-    } catch (err: any) {
-      alert(`Error updating receipt: ${err.message}`)
-    }
-  }
-
-  const handleDelete = async (receiptId: string) => {
-    if (!confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
-      return
-    }
-
-    try {
-      await deleteReceipt({
-        variables: { id: receiptId },
-      })
-      alert('Receipt deleted successfully!')
-    } catch (err: any) {
-      alert(`Error deleting receipt: ${err.message}`)
-    }
-  }
-
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) {
-      return
-    }
-
-    try {
-      await deleteItem({
-        variables: { id: itemId },
-      })
-      if (editingReceipt) {
-        // Refresh the edit form
-        refetch()
-      }
-    } catch (err: any) {
-      alert(`Error deleting item: ${err.message}`)
-    }
-  }
-
-  const addItemToEdit = () => {
-    setEditForm({
-      ...editForm,
-      items: [...editForm.items, { id: null, name: '', quantity: '', price: '' }],
-    })
-  }
-
-  const removeItemFromEdit = (index: number) => {
-    const items = [...editForm.items]
-    items.splice(index, 1)
-    setEditForm({ ...editForm, items })
-  }
-
-  const updateItemInEdit = (index: number, field: string, value: any) => {
-    const items = [...editForm.items]
-    items[index] = { ...items[index], [field]: value }
-    setEditForm({ ...editForm, items })
-  }
-
-  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   return (
     <div className="container">
       {/* Header */}
       <header className="header">
-        <div className="header-left">
+        <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div className="logo">
             <span>🤖</span>
             <span>Receipt OCR</span>
@@ -303,24 +165,17 @@ export default function Home() {
           <ul className="nav-menu">
             <li><a onClick={() => setActiveView('all')}>All Receipts</a></li>
             <li><a onClick={() => setActiveView('verified')}>Verified</a></li>
-            <li><a onClick={() => setSidebarOpen(!sidebarOpen)}>Filters</a></li>
           </ul>
         </div>
         <div className="header-right">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="button button-secondary"
-            style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-          >
-            {sidebarOpen ? '← Hide' : '→ Show'} Sidebar
-          </button>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Data Extraction System</span>
         </div>
       </header>
 
       {/* Main Wrapper */}
       <div className="main-wrapper">
         {/* Sidebar */}
-        <div className={`sidebar ${!sidebarOpen ? 'hidden' : ''}`}>
+        <div className="sidebar">
         {/* Sidebar Header */}
         <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
           <h2 style={{ fontSize: '1.3rem', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--text-primary)' }}>Data Extraction</h2>
@@ -426,7 +281,7 @@ export default function Home() {
         </div>
 
         {/* Main Content */}
-        <div className={`main-content ${!sidebarOpen ? 'full-width' : ''}`}>
+        <div className="main-content">
           <div style={{ marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
               {activeView === 'verified' ? 'Verified Receipts' : 'Receipt Validator'}
@@ -481,36 +336,22 @@ export default function Home() {
           }
           
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+            <div className="receipts-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
               {filteredReceipts.map((receipt: any) => (
               <div key={receipt.id} className="card" style={{ position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
-                    <h3>{receipt.storeName || 'Unknown Store'}</h3>
-                    <p><strong>Date:</strong> {formatDate(receipt.purchaseDate)}</p>
-                    <p><strong>Total Amount:</strong> ${receipt.totalAmount?.toFixed(2) || 'N/A'}</p>
+                    <h3 style={{ marginBottom: '0.5rem', fontSize: '1.2rem' }}>{receipt.storeName || 'Unknown Store'}</h3>
+                    <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}><strong>Date:</strong> {formatDate(receipt.purchaseDate)}</p>
+                    <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}><strong>Total Amount:</strong> ETB {receipt.totalAmount?.toFixed(2) || 'N/A'}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div className="receipt-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => handleViewDetails(receipt)}
                       className="button"
-                      style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                      style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', width: '100%' }}
                     >
-                      View
-                    </button>
-                    <button
-                      onClick={() => handleEdit(receipt)}
-                      className="button"
-                      style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', background: '#28a745' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(receipt.id)}
-                      className="button"
-                      style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', background: '#dc3545' }}
-                    >
-                      Delete
+                      View Details
                     </button>
                   </div>
                 </div>
@@ -597,238 +438,122 @@ export default function Home() {
             >
               ×
             </button>
-            <h2>Receipt Details</h2>
-            <div style={{ marginTop: '1rem' }}>
-              <p><strong>ID:</strong> {selectedReceipt.id}</p>
-              <p><strong>Store Name:</strong> {selectedReceipt.storeName || 'N/A'}</p>
-              <p><strong>Purchase Date:</strong> {formatDateTime(selectedReceipt.purchaseDate)}</p>
-              <p><strong>Total Amount:</strong> ${selectedReceipt.totalAmount?.toFixed(2) || 'N/A'}</p>
-              <p><strong>Created:</strong> {formatDateTime(selectedReceipt.createdAt)}</p>
-              {selectedReceipt.updatedAt && (
-                <p><strong>Last Updated:</strong> {formatDateTime(selectedReceipt.updatedAt)}</p>
-              )}
-            </div>
-            {selectedReceipt.imageUrl && (
-              <div style={{ marginTop: '1rem' }}>
-                <img
-                  src={`${API_URL}${selectedReceipt.imageUrl}`}
-                  alt="Receipt"
-                  style={{ maxWidth: '100%', borderRadius: '4px' }}
-                />
+            <h2 style={{ marginBottom: '2rem', fontSize: '1.8rem', color: 'var(--text-primary)' }}>Receipt Details</h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Store Name */}
+              <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Store Name</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                  {selectedReceipt.storeName || 'N/A'}
+                </div>
               </div>
-            )}
-            <div style={{ marginTop: '1rem' }}>
-              <h3>Items ({selectedReceipt.items?.length || 0}):</h3>
-              {selectedReceipt.items && selectedReceipt.items.length > 0 ? (
-                <table style={{ width: '100%', marginTop: '0.5rem', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #ddd' }}>
-                      <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name</th>
-                      <th style={{ textAlign: 'right', padding: '0.5rem' }}>Quantity</th>
-                      <th style={{ textAlign: 'right', padding: '0.5rem' }}>Price</th>
-                      <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedReceipt.items.map((item: any) => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '0.5rem' }}>{item.name}</td>
-                        <td style={{ textAlign: 'right', padding: '0.5rem' }}>{item.quantity || '-'}</td>
-                        <td style={{ textAlign: 'right', padding: '0.5rem' }}>
-                          {item.price ? `$${item.price.toFixed(2)}` : '-'}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '0.5rem' }}>
-                          {item.quantity && item.price ? `$${(item.quantity * item.price).toFixed(2)}` : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>No items extracted</p>
-              )}
-            </div>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={() => {
-                  setSelectedReceipt(null)
-                  handleEdit(selectedReceipt)
-                }}
-                className="button"
-                style={{ background: '#28a745' }}
-              >
-                Edit Receipt
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedReceipt(null)
-                  handleDelete(selectedReceipt.id)
-                }}
-                className="button"
-                style={{ background: '#dc3545' }}
-              >
-                Delete Receipt
-              </button>
+
+              {/* Date of Purchase */}
+              <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date of Purchase</div>
+                <div style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                  {formatDate(selectedReceipt.purchaseDate)}
+                </div>
+              </div>
+
+              {/* Total Amount Spent */}
+              <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Amount Spent</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--primary-color)' }}>
+                  {selectedReceipt.totalAmount ? `ETB ${selectedReceipt.totalAmount.toFixed(2)}` : 'N/A'}
+                </div>
+              </div>
+
+              {/* List of Purchased Items */}
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>List of Purchased Items</div>
+                {selectedReceipt.items && selectedReceipt.items.length > 0 ? (
+                  <div style={{ 
+                    backgroundColor: 'var(--card-bg)', 
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    overflow: 'hidden'
+                  }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ 
+                          backgroundColor: 'var(--border-color)',
+                          borderBottom: '2px solid var(--border-color)'
+                        }}>
+                          <th style={{ 
+                            textAlign: 'left', 
+                            padding: '0.75rem 1rem', 
+                            fontSize: '0.85rem',
+                            fontWeight: '600',
+                            color: 'var(--text-secondary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Item Name
+                          </th>
+                          <th style={{ 
+                            textAlign: 'center', 
+                            padding: '0.75rem 1rem', 
+                            fontSize: '0.85rem',
+                            fontWeight: '600',
+                            color: 'var(--text-secondary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            width: '100px'
+                          }}>
+                            Quantity
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedReceipt.items.map((item: any, index: number) => (
+                          <tr 
+                            key={item.id || index}
+                            style={{
+                              borderBottom: index < selectedReceipt.items.length - 1 ? '1px solid var(--border-color)' : 'none'
+                            }}
+                          >
+                            <td style={{ 
+                              padding: '0.75rem 1rem', 
+                              fontSize: '0.95rem',
+                              color: 'var(--text-primary)',
+                              fontWeight: '500'
+                            }}>
+                              {item.name}
+                            </td>
+                            <td style={{ 
+                              textAlign: 'center', 
+                              padding: '0.75rem 1rem',
+                              fontSize: '0.95rem',
+                              color: 'var(--text-primary)',
+                              fontWeight: '500'
+                            }}>
+                              {item.quantity || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    padding: '2rem', 
+                    textAlign: 'center', 
+                    color: 'var(--text-secondary)',
+                    backgroundColor: 'var(--card-bg)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    No items extracted
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Modal */}
-      {editingReceipt && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '2rem',
-        }} onClick={() => {
-          setEditingReceipt(null)
-          setEditForm({})
-        }}>
-          <div className="card" style={{
-            maxWidth: '600px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            position: 'relative',
-          }} onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => {
-                setEditingReceipt(null)
-                setEditForm({})
-              }}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '50%',
-                width: '30px',
-                height: '30px',
-                cursor: 'pointer',
-                fontSize: '1.2rem',
-              }}
-            >
-              ×
-            </button>
-            <h2>Edit Receipt</h2>
-            <div style={{ marginTop: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Store Name:</label>
-              <input
-                type="text"
-                value={editForm.storeName || ''}
-                onChange={(e) => setEditForm({ ...editForm, storeName: e.target.value })}
-                className="input"
-                placeholder="Store name"
-              />
-            </div>
-            <div style={{ marginTop: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Purchase Date:</label>
-              <input
-                type="date"
-                value={editForm.purchaseDate || ''}
-                onChange={(e) => setEditForm({ ...editForm, purchaseDate: e.target.value })}
-                className="input"
-              />
-            </div>
-            <div style={{ marginTop: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Total Amount:</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editForm.totalAmount || ''}
-                onChange={(e) => setEditForm({ ...editForm, totalAmount: e.target.value })}
-                className="input"
-                placeholder="0.00"
-              />
-            </div>
-            <div style={{ marginTop: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <label>Items:</label>
-                <button
-                  onClick={addItemToEdit}
-                  className="button"
-                  style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}
-                >
-                  + Add Item
-                </button>
-              </div>
-              {editForm.items && editForm.items.map((item: any, index: number) => (
-                <div key={index} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 1fr 1fr auto',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem',
-                  alignItems: 'center',
-                }}>
-                  <input
-                    type="text"
-                    value={item.name || ''}
-                    onChange={(e) => updateItemInEdit(index, 'name', e.target.value)}
-                    className="input"
-                    placeholder="Item name"
-                  />
-                  <input
-                    type="number"
-                    value={item.quantity || ''}
-                    onChange={(e) => updateItemInEdit(index, 'quantity', e.target.value)}
-                    className="input"
-                    placeholder="Qty"
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.price || ''}
-                    onChange={(e) => updateItemInEdit(index, 'price', e.target.value)}
-                    className="input"
-                    placeholder="Price"
-                  />
-                  <button
-                    onClick={() => {
-                      if (item.id) {
-                        handleDeleteItem(item.id)
-                      } else {
-                        removeItemFromEdit(index)
-                      }
-                    }}
-                    className="button"
-                    style={{ background: '#dc3545', padding: '0.4rem 0.8rem' }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={handleUpdate}
-                className="button"
-                style={{ background: '#28a745', flex: 1 }}
-              >
-                Save Changes
-              </button>
-              <button
-                onClick={() => {
-                  setEditingReceipt(null)
-                  setEditForm({})
-                }}
-                className="button"
-                style={{ flex: 1 }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
