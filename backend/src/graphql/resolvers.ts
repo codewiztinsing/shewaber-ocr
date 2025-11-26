@@ -6,6 +6,26 @@ interface Context {
 }
 
 export const resolvers = {
+  Receipt: {
+    purchaseDate: (parent: any) => {
+      if (!parent.purchaseDate) {
+        return null;
+      }
+      // Ensure date is serialized as ISO string
+      const date = parent.purchaseDate instanceof Date 
+        ? parent.purchaseDate 
+        : new Date(parent.purchaseDate);
+      
+      if (isNaN(date.getTime())) {
+        console.log('[GraphQL] Invalid purchaseDate:', parent.purchaseDate);
+        return null;
+      }
+      
+      const isoString = date.toISOString();
+      console.log('[GraphQL] Serializing purchaseDate:', parent.purchaseDate, '->', isoString);
+      return isoString;
+    },
+  },
   Query: {
     receipts: async (_: any, args: { filter?: any }, context: Context) => {
       const { filter } = args;
@@ -35,9 +55,14 @@ export const resolvers = {
         include: {
           items: true,
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: [
+          {
+            purchaseDate: 'desc', // Most recent purchase date first
+          },
+          {
+            createdAt: 'desc', // Fallback to creation date if purchaseDate is null
+          },
+        ],
       });
     },
 

@@ -1,192 +1,156 @@
-# Receipt OCR & Data Extraction API
+📸 Receipt OCR & Data Extraction API
 
-A full-stack application that processes uploaded receipt images, extracts structured data using OCR, and exposes it via a GraphQL API.
+A modern full-stack application that lets users upload receipt images, automatically extracts structured information using OCR, and exposes the data through a clean GraphQL API.
 
-## Tech Stack
+ What This Project Does
 
-### Backend
-- **Node.js** with **TypeScript**
-- **Apollo GraphQL Server** - GraphQL API
-- **Prisma ORM** - Database ORM
-- **PostgreSQL** - Database
-- **Tesseract.js** - OCR engine for text extraction
-- **Express** - HTTP server
-- **Multer** - File upload handling
+Upload a receipt → The system reads the text → Extracts useful data → Stores it → Lets you query it.
 
-### Frontend
-- **Next.js 14** - React framework
-- **Apollo Client** - GraphQL client
-- **TypeScript** - Type safety
+The app can extract:
 
-### DevOps
-- **Docker** & **Docker Compose** - Containerization
+ Store name
 
-## Features
+ Purchase date
 
-✅ Upload receipt images (JPEG, PNG, GIF, WebP)  
-✅ Extract structured data:
-   - Store name
-   - Purchase date
-   - Total amount
-   - List of items with quantities and prices
-✅ GraphQL API for queries and mutations  
-✅ Filter receipts by store name and date range  
-✅ Image validation (type and size)  
-✅ Store extracted data in PostgreSQL  
-✅ Docker support for easy setup  
+ Total amount
 
-## Project Structure
+ List of purchased items (name, quantity, price)
 
-```
+And provides:
+
+GraphQL API for queries/mutations
+
+A Next.js frontend for uploading and browsing receipts
+
+Filtering by store name and date range
+
+Full Docker support
+
+Tech Stack Overview
+Backend
+
+Node.js + TypeScript
+
+Express + Apollo GraphQL Server
+
+Prisma ORM
+
+PostgreSQL
+
+Tesseract.js (OCR)
+
+Multer (file uploads)
+
+Frontend
+
+Next.js 14
+
+Apollo Client
+
+TypeScript
+
+DevOps
+
+Docker & Docker Compose
+
+ Project Structure
 shewaber-ocr/
 ├── backend/
 │   ├── src/
-│   │   ├── graphql/
-│   │   │   ├── schema.ts          # GraphQL schema
-│   │   │   └── resolvers.ts       # GraphQL resolvers
-│   │   ├── services/
-│   │   │   └── ocr.service.ts     # OCR extraction logic
-│   │   ├── utils/
-│   │   │   └── fileUpload.ts      # File upload utilities
-│   │   └── index.ts               # Server entry point
-│   ├── prisma/
-│   │   └── schema.prisma          # Database schema
-│   ├── uploads/                   # Uploaded receipt images
+│   │   ├── graphql/     # Schema & resolvers
+│   │   ├── services/    # OCR logic
+│   │   ├── utils/       # File upload helper
+│   │   └── index.ts     # Server entry
+│   ├── prisma/          # DB schema
+│   ├── uploads/         # Uploaded images
 │   ├── Dockerfile
 │   └── package.json
 ├── frontend/
-│   ├── src/
-│   │   └── app/
-│   │       ├── page.tsx           # Main page
-│   │       ├── layout.tsx         # Root layout
-│   │       └── globals.css       # Global styles
+│   ├── src/app/         # Next.js pages & components
 │   ├── Dockerfile
 │   └── package.json
 ├── docker-compose.yml
 └── README.md
-```
 
-## Setup & Run Instructions
-
-### Prerequisites
-- Node.js 18+ and npm
-- PostgreSQL 15+ (or use Docker)
-- Docker and Docker Compose (optional)
-
-### Option 1: Local Development (Without Docker)
-
-#### 1. Clone and Install Dependencies
-
-```bash
-# Install root dependencies
+🛠️ Local Development Setup
+1. Install Dependencies
 npm install
+cd backend && npm install
+cd ../frontend && npm install
 
-# Install backend dependencies
-cd backend
-npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
-```
-
-#### 2. Set Up Database
-
-```bash
-# Create a PostgreSQL database
+2. Create PostgreSQL Database
 createdb shewaber_ocr
 
-# Or using psql
-psql -U postgres
+
+Or with SQL:
+
 CREATE DATABASE shewaber_ocr;
-```
 
-#### 3. Configure Environment Variables
+3. Configure Environment Files
 
-```bash
-# Backend
+Backend:
+
 cd backend
 cp .env.example .env
-# Edit .env and set your DATABASE_URL
-```
 
-```bash
-# Frontend
+
+Frontend:
+
 cd frontend
 cp .env.local.example .env.local
-# Edit .env.local if needed (default should work)
-```
 
-#### 4. Run Database Migrations
-
-```bash
+4. Apply Prisma Migrations
 cd backend
 npx prisma migrate dev
 npx prisma generate
-```
 
-#### 5. Start Development Servers
-
-```bash
-# From root directory
+5. Run Servers
 npm run dev
 
-# Or separately:
-# Terminal 1 - Backend
-cd backend
-npm run dev
 
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
-```
+Frontend → http://localhost:3000
 
-The application will be available at:
-- Frontend: http://localhost:3000
-- Backend GraphQL: http://localhost:4000/graphql
+Backend → http://localhost:4000/graphql
 
-### Option 2: Docker (Recommended)
-
-```bash
-# Build and start all services
+🐳 Running With Docker (Recommended)
 docker-compose up --build
 
-# Or in detached mode
-docker-compose up -d --build
-```
 
-This will start:
-- PostgreSQL on port 5432
-- Backend API on port 4000
-- Frontend on port 3000
+Starts:
 
-To stop:
-```bash
+PostgreSQL (5432)
+
+Backend API (4000)
+
+Frontend App (3000)
+
+Stop:
+
 docker-compose down
-```
 
-## Usage
+🧪 How to Use the App
+Upload a Receipt
 
-### Upload a Receipt
+Go to http://localhost:3000
 
-1. Open http://localhost:3000
-2. Click "Choose File" and select a receipt image
-3. Click "Upload & Extract"
-4. Wait for OCR processing (may take 10-30 seconds)
-5. View the extracted data
+Choose an image (JPG/PNG/WebP/GIF)
 
-### Filter Receipts
+Click Upload & Extract
 
-- Enter a store name to filter by store
-- Select start and end dates to filter by date range
-- Click "Apply Filters"
+OCR runs (≈10–30 sec)
 
-### GraphQL API
+Extracted data appears instantly
 
-You can also interact with the API directly using GraphQL:
+Filter Receipts
 
-**Upload Receipt:**
-```graphql
+Filter by store name
+
+Filter by date range
+
+Combine both
+
+🧬 GraphQL API Examples
+Upload a Receipt
 mutation UploadReceipt($file: Upload!) {
   uploadReceipt(file: $file) {
     id
@@ -200,10 +164,8 @@ mutation UploadReceipt($file: Upload!) {
     }
   }
 }
-```
 
-**Query Receipts:**
-```graphql
+Get Receipts
 query GetReceipts($filter: ReceiptFilter) {
   receipts(filter: $filter) {
     id
@@ -217,103 +179,8 @@ query GetReceipts($filter: ReceiptFilter) {
     }
   }
 }
-```
 
-## Testing
-
-### Sample Receipts
-
-You can test the application with any receipt image. The OCR engine will attempt to extract:
-- Store name from the header
-- Date from various date formats
-- Total amount from lines containing "TOTAL", "AMOUNT", etc.
-- Items from product lines
-
-**Note:** OCR accuracy depends on image quality. For best results:
-- Use clear, high-resolution images
-- Ensure text is readable
-- Avoid blurry or rotated images
-
-## How to Extend the App
-
-### Add User Authentication
-
-1. Add a `User` model to Prisma schema:
-```prisma
-model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  receipts  Receipt[]
-  createdAt DateTime  @default(now())
-}
-```
-
-2. Update `Receipt` model to include `userId`
-3. Add authentication middleware (JWT, Passport, etc.)
-4. Update GraphQL resolvers to check authentication
-
-### Add Receipt Categorization
-
-1. Add a `Category` model:
-```prisma
-model Category {
-  id        String    @id @default(uuid())
-  name      String
-  receipts  Receipt[]
-}
-```
-
-2. Add `categoryId` to `Receipt` model
-3. Add category selection in frontend
-4. Add category filter to GraphQL queries
-
-### Export Data
-
-1. Add an export resolver:
-```typescript
-exportReceipts: async (_, args, context) => {
-  // Generate CSV/JSON/PDF
-  // Return download link
-}
-```
-
-2. Add export button in frontend
-3. Implement CSV/JSON/PDF generation
-
-### Background Processing with Queues
-
-1. Install BullMQ:
-```bash
-npm install bullmq ioredis
-```
-
-2. Set up Redis (add to docker-compose.yml)
-3. Create a queue for OCR processing
-4. Move OCR logic to a worker
-5. Return job ID immediately, poll for results
-
-### Add More OCR Providers
-
-The current implementation uses Tesseract.js. You can extend it to support:
-- Google Cloud Vision API
-- AWS Textract
-- Azure Computer Vision
-
-Create an interface and implement multiple providers:
-
-```typescript
-interface OCRProvider {
-  extractText(imagePath: string): Promise<string>;
-}
-
-class TesseractProvider implements OCRProvider { ... }
-class GoogleVisionProvider implements OCRProvider { ... }
-```
-
-## Database Schema
-
-```prisma
+🗄️ Database Models
 model Receipt {
   id           String   @id @default(uuid())
   storeName    String?
@@ -334,35 +201,3 @@ model Item {
   receipt   Receipt  @relation(fields: [receiptId], references: [id])
   createdAt DateTime @default(now())
 }
-```
-
-## Troubleshooting
-
-### OCR Not Extracting Data
-
-- Check image quality and resolution
-- Ensure text is clear and not rotated
-- Check server logs for OCR errors
-- Try different receipt formats
-
-### Database Connection Issues
-
-- Verify PostgreSQL is running
-- Check DATABASE_URL in .env
-- Ensure database exists
-- Run migrations: `npx prisma migrate dev`
-
-### File Upload Fails
-
-- Check file size (max 10MB)
-- Verify file type (JPEG, PNG, GIF, WebP only)
-- Ensure uploads directory exists and is writable
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-

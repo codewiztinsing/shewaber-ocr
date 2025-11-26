@@ -35,12 +35,11 @@ export interface OCRJobData {
 export interface OCRJobResult {
   receiptId: string;
   storeName?: string;
-  purchaseDate?: Date;
+  purchaseDate?: string; // ISO string format
   totalAmount?: number;
   items: Array<{
     name: string;
     quantity?: number;
-    price?: number;
   }>;
 }
 

@@ -60,7 +60,6 @@ export const typeDefs = gql`
   type ItemResult {
     name: String!
     quantity: Int
-    price: Float
   }
 
   type UploadResponse {

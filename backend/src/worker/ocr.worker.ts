@@ -75,7 +75,6 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
               create: extractedData.items.map((item) => ({
                 name: item.name,
                 quantity: item.quantity || null,
-                price: item.price || null,
               })),
             },
           },
@@ -101,7 +100,6 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
               create: extractedData.items.map((item) => ({
                 name: item.name,
                 quantity: item.quantity || null,
-                price: item.price || null,
               })),
             },
           },
@@ -115,16 +113,15 @@ export const ocrWorker = new Worker<OCRJobData, OCRJobResult>(
 
       console.log(`[Worker] Successfully processed job ${job.id}, receipt ID: ${receipt.id}`);
 
-      // Return result
+      // Return only parsed structured data
       return {
         receiptId: receipt.id,
         storeName: receipt.storeName || undefined,
-        purchaseDate: receipt.purchaseDate || undefined,
+        purchaseDate: receipt.purchaseDate ? receipt.purchaseDate.toISOString() : undefined,
         totalAmount: receipt.totalAmount || undefined,
         items: receipt.items.map((item) => ({
           name: item.name,
           quantity: item.quantity || undefined,
-          price: item.price || undefined,
         })),
       };
     } catch (error: any) {

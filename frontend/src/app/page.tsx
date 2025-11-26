@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, gql } from '@apollo/client'
 
 // API URL - will be replaced at build time with NEXT_PUBLIC_API_URL
@@ -58,6 +58,22 @@ export default function Home() {
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
   const [activeView, setActiveView] = useState<'all' | 'verified'>('all')
 
+  // Debug: Log when selectedReceipt changes
+  useEffect(() => {
+    if (selectedReceipt) {
+      console.log('[Frontend] selectedReceipt changed:', {
+        id: selectedReceipt.id,
+        storeName: selectedReceipt.storeName,
+        purchaseDate: selectedReceipt.purchaseDate,
+        purchaseDateType: typeof selectedReceipt.purchaseDate,
+        purchaseDateValue: selectedReceipt.purchaseDate,
+        fullReceipt: selectedReceipt,
+      });
+    } else {
+      console.log('[Frontend] selectedReceipt cleared');
+    }
+  }, [selectedReceipt])
+
   const { data, loading, error, refetch } = useQuery(GET_RECEIPTS, {
     variables: {
       filter: {
@@ -65,6 +81,32 @@ export default function Home() {
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
       },
+    },
+    onCompleted: (data) => {
+      console.log('[Frontend] GraphQL query completed, receipts received:', data.receipts?.length || 0);
+      console.log('[Frontend] Raw GraphQL data:', JSON.stringify(data, null, 2));
+      if (data.receipts) {
+        data.receipts.forEach((receipt: any, index: number) => {
+          console.log(`[Frontend] Receipt ${index + 1}:`, {
+            id: receipt.id,
+            storeName: receipt.storeName,
+            purchaseDate: receipt.purchaseDate,
+            purchaseDateType: typeof receipt.purchaseDate,
+            purchaseDateValue: receipt.purchaseDate,
+            purchaseDateIsNull: receipt.purchaseDate === null,
+            purchaseDateIsUndefined: receipt.purchaseDate === undefined,
+            purchaseDateIsEmpty: receipt.purchaseDate === '',
+          });
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('[Frontend] GraphQL query error:', error);
+      console.error('[Frontend] Error details:', {
+        message: error.message,
+        graphQLErrors: error.graphQLErrors,
+        networkError: error.networkError,
+      });
     },
   })
 
@@ -138,19 +180,7 @@ export default function Home() {
     })
   }
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString()
-  }
 
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleString()
-  }
-
-  const handleViewDetails = (receipt: any) => {
-    setSelectedReceipt(receipt)
-  }
 
 
   return (
@@ -256,6 +286,7 @@ export default function Home() {
 
         {/* Stats Section */}
         {data && data.receipts && (
+        
           <div className="card" style={{ marginTop: '1.5rem' }}>
             <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Statistics</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -342,12 +373,28 @@ export default function Home() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <h3 style={{ marginBottom: '0.5rem', fontSize: '1.2rem' }}>{receipt.storeName || 'Unknown Store'}</h3>
-                    <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}><strong>Date:</strong> {formatDate(receipt.purchaseDate)}</p>
+                    <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}>
+                      <strong>Date:</strong> {(() => {
+                        console.log('[Frontend] Rendering date for receipt:', receipt.id, '| purchaseDate:', receipt.purchaseDate, '| type:', typeof receipt.purchaseDate, '| isNull:', receipt.purchaseDate === null, '| isUndefined:', receipt.purchaseDate === undefined);
+                        if (receipt.purchaseDate === null || receipt.purchaseDate === undefined) {
+                          return 'N/A';
+                        }
+                        return receipt.purchaseDate;
+                      })()}
+                    </p>
                     <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}><strong>Total Amount:</strong> ETB {receipt.totalAmount?.toFixed(2) || 'N/A'}</p>
                   </div>
                   <div className="receipt-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
-                      onClick={() => handleViewDetails(receipt)}
+                      onClick={() => {
+                        console.log('[Frontend] View Details clicked for receipt:', {
+                          id: receipt.id,
+                          storeName: receipt.storeName,
+                          purchaseDate: receipt.purchaseDate,
+                          purchaseDateType: typeof receipt.purchaseDate,
+                        });
+                        setSelectedReceipt(receipt);
+                      }}
                       className="button"
                       style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', width: '100%' }}
                     >
@@ -361,7 +408,7 @@ export default function Home() {
                       src={`${API_URL}${receipt.imageUrl}`}
                       alt="Receipt"
                       style={{ maxWidth: '100%', marginTop: '1rem', borderRadius: '4px', cursor: 'pointer' }}
-                      onClick={() => handleViewDetails(receipt)}
+                      onClick={() => setSelectedReceipt(receipt)}
                       onError={(e) => {
                         console.error('Failed to load image:', receipt.imageUrl);
                         (e.target as HTMLImageElement).style.display = 'none';
@@ -453,7 +500,22 @@ export default function Home() {
               <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date of Purchase</div>
                 <div style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                  {formatDate(selectedReceipt.purchaseDate)}
+                  {(() => {
+                    console.log('[Frontend] Detail Modal - Selected Receipt:', {
+                      id: selectedReceipt.id,
+                      storeName: selectedReceipt.storeName,
+                      purchaseDate: selectedReceipt.purchaseDate,
+                      purchaseDateType: typeof selectedReceipt.purchaseDate,
+                      purchaseDateValue: selectedReceipt.purchaseDate,
+                      isNull: selectedReceipt.purchaseDate === null,
+                      isUndefined: selectedReceipt.purchaseDate === undefined,
+                      fullReceipt: selectedReceipt,
+                    });
+                    if (selectedReceipt.purchaseDate === null || selectedReceipt.purchaseDate === undefined) {
+                      return 'N/A';
+                    }
+                    return selectedReceipt.purchaseDate;
+                  })()}
                 </div>
               </div>
 
